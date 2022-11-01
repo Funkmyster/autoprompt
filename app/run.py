@@ -157,10 +157,7 @@ class Dataset:
 
 
 def load_trigger_dataset(dataset, templatizer):
-    instances = []
-    for x in dataset:
-        instances.append(templatizer(x))
-    return instances
+    return [templatizer(x) for x in dataset]
 
 
 @st.cache(suppress_st_warning=True, allow_output_mutation=True, hash_funcs={CacheTest: lambda o: 0})
@@ -208,7 +205,7 @@ def run_autoprompt(args, dataset, cache_test):
     for i in range(args.iters):
         logger.info(f'Iteration: {i}')
         progress.progress(float(i)/args.iters)
-        
+
         current_trigger = ','.join(global_data.tokenizer.convert_ids_to_tokens(best_trigger_ids.squeeze(0)))
         trigger_placeholder.markdown(f'**Current trigger**: {current_trigger}')
 
@@ -217,7 +214,7 @@ def run_autoprompt(args, dataset, cache_test):
         averaged_grad = None
 
         # Compute gradient of loss
-        for step in range(args.accumulation_steps):
+        for _ in range(args.accumulation_steps):
             try:
                 model_inputs, labels = next(train_iter)
             except:
@@ -368,9 +365,9 @@ def manual_dataset(use_defaults):
         default_data = DEFAULT_TRAIN[i]['sentence'] if use_defaults else ''
         default_label = DEFAULT_TRAIN[i]['label'] if use_defaults else ''
         with data_col:
-            data = st.text_input("Train Instance " + str(i+1), default_data)
+            data = st.text_input(f"Train Instance {str(i + 1)}", default_data)
         with label_col:
-            label = st.text_input("Train Label " + str(i+1), default_label, max_chars=20)
+            label = st.text_input(f"Train Label {str(i + 1)}", default_label, max_chars=20)
         if data == "" or label == "":
             any_empty = True
         dataset.append({'sentence': data, 'label': label})
@@ -414,7 +411,7 @@ def csv_dataset():
         raise ValueError('Train dataset is too large. Please limit the number '
                          'of examples to 64 or less.')
 
-    labels = set(x['label'] for x in train_dataset)
+    labels = {x['label'] for x in train_dataset}
     label_map = {x: x for x in labels}
 
     return Dataset(
@@ -504,9 +501,7 @@ def run():
         dataset = csv_dataset()
 
     button = st.empty()
-    clicked = button.button('Train')
-
-    if clicked:
+    if clicked := button.button('Train'):
         trigger_tokens, eval_metric, label_map, templatizer, best_trigger_ids, tokenizer, predictor, args, train_output = run_autoprompt(args, dataset, cache_test=CacheTest(False))
     else:
         try:
@@ -520,7 +515,7 @@ def run():
     st.markdown(f'**Final trigger**: {", ".join(trigger_tokens)}')
     st.dataframe(pd.DataFrame(train_output).style.highlight_min(axis=1, color=HIGHLIGHT_COLOR))
     logger.debug('Dev metric')
-    st.write('Accuracy: ' + str(round(eval_metric.item()*100, 1)))
+    st.write(f'Accuracy: {str(round(eval_metric.item() * 100, 1))}')
     st.write("""
     Et voila, you've now effectively finetuned a classifier using just a few
     kilobytes of parameters (the tokens in the prompt). If you like you can

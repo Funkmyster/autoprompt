@@ -65,7 +65,7 @@ def main(args):
 
     best_accuracy = 0
     try:
-        for epoch in range(args.epochs):
+        for _ in range(args.epochs):
             logger.info('Training...')
             model.eval()  # Just linear regression - don't want model outputs changing during training.
             avg_loss = utils.ExponentialMovingAverage()
@@ -142,10 +142,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_file', type=str, default='log.txt')
     args = parser.parse_args()
 
-    if args.debug:
-        level = logging.DEBUG
-    else:
-        level = logging.INFO
+    level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=level, filename=args.log_file)
 
     main(args)

@@ -90,11 +90,7 @@ def main(args):
     )
     test_loader = DataLoader(test_dataset, batch_size=args.bsz, shuffle=False, collate_fn=collator)
 
-    if args.bias_correction:
-        betas = (0.9, 0.999)
-    else:
-        betas = (0.0, 0.000)
-
+    betas = (0.9, 0.999) if args.bias_correction else (0.0, 0.000)
     optimizer = AdamW(
         model.parameters(),
         lr=args.lr,
@@ -116,7 +112,7 @@ def main(args):
 
     try:
         best_accuracy = 0
-        for epoch in range(args.epochs):
+        for _ in range(args.epochs):
             logger.info('Training...')
             model.train()
             avg_loss = utils.ExponentialMovingAverage()
@@ -194,10 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    if args.debug:
-        level = logging.DEBUG
-    else:
-        level = logging.INFO
+    level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=level)
 
     main(args)
