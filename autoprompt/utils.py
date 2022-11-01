@@ -69,10 +69,7 @@ class Collator:
         keys = list(proto_input.keys())
         padded_inputs = {}
         for key in keys:
-            if key == 'input_ids':
-                padding_value = self._pad_token_id
-            else:
-                padding_value = 0
+            padding_value = self._pad_token_id if key == 'input_ids' else 0
             # NOTE: We need to squeeze to get rid of fake batch dim.
             sequence = [x[key] for x in model_inputs]
             padded = pad_squeeze_sequence(sequence, batch_first=True, padding_value=padding_value)
@@ -210,9 +207,7 @@ def add_task_specific_tokens(tokenizer):
 
 def load_tsv(fname):
     with open(fname, 'r') as f:
-        reader = csv.DictReader(f, delimiter='\t')
-        for row in reader:
-            yield row
+        yield from csv.DictReader(f, delimiter='\t')
 
 
 def load_jsonl(fname):
@@ -236,34 +231,29 @@ def load_trigger_dataset(fname, templatizer, use_ctx, limit=None):
             if use_ctx:
                 # For relation extraction, skip facts that don't have context sentence
                 if 'evidences' not in x:
-                    logger.warning('Skipping RE sample because it lacks context sentences: {}'.format(x))
+                    logger.warning(f'Skipping RE sample because it lacks context sentences: {x}')
                     continue
 
                 evidences = x['evidences']
-                    
+
                 # Randomly pick a context sentence
                 obj_surface, masked_sent = random.choice([(evidence['obj_surface'], evidence['masked_sentence']) for evidence in evidences])
                 words = masked_sent.split()
                 if len(words) > MAX_CONTEXT_LEN:
                     # If the masked sentence is too long, use the first X tokens. For training we want to keep as many samples as we can.
                     masked_sent = ' '.join(words[:MAX_CONTEXT_LEN])
-                
+
                 # If truncated context sentence still has MASK, we need to replace it with object surface
                 # We explicitly use [MASK] because all TREx fact's context sentences use it
                 context = masked_sent.replace('[MASK]', obj_surface)
                 x['context'] = context
-                model_inputs, label_id = templatizer(x)
-            else:
-                model_inputs, label_id = templatizer(x)
+            model_inputs, label_id = templatizer(x)
         except ValueError as e:
             logger.warning('Encountered error "%s" when processing "%s".  Skipping.', e, x)
             continue
         else:
             instances.append((model_inputs, label_id))
-    if limit:
-        return random.sample(instances, limit)
-    else:
-        return instances
+    return random.sample(instances, limit) if limit else instances
 
 
 def load_augmented_trigger_dataset(fname, templatizer, limit=None):
@@ -282,7 +272,7 @@ def load_augmented_trigger_dataset(fname, templatizer, limit=None):
 
             # For relation extraction, skip facts that don't have context sentence
             if 'evidences' not in x:
-                logger.warning('Skipping RE sample because it lacks context sentences: {}'.format(x))
+                logger.warning(f'Skipping RE sample because it lacks context sentences: {x}')
                 continue
 
             evidences = x['evidences']
@@ -292,14 +282,14 @@ def load_augmented_trigger_dataset(fname, templatizer, limit=None):
                 obj_surface = evidence['obj_surface']
                 masked_sent = evidence['masked_sentence']
                 unique_objs_dict[obj_label].append(obj_surface)
-                
+
             # Randomly pick a context sentence
             obj_surface, masked_sent = random.choice([(evidence['obj_surface'], evidence['masked_sentence']) for evidence in evidences])
             words = masked_sent.split()
             if len(words) > MAX_CONTEXT_LEN:
                 # If the masked sentence is too long, use the first X tokens. For training we want to keep as many samples as we can.
                 masked_sent = ' '.join(words[:MAX_CONTEXT_LEN])
-            
+
             x['context'] = masked_sent
             facts.append(x)
         except ValueError as e:
@@ -312,7 +302,10 @@ def load_augmented_trigger_dataset(fname, templatizer, limit=None):
         obj_label = fact['obj_label']
         masked_sent = fact['context']
         # print('Original fact: ({}, {}, {})'.format(sub_label, obj_label, masked_sent))
-        synth_obj_label = random.choice([x for x in unique_objs_dict.keys() if x != obj_label])
+        synth_obj_label = random.choice(
+            [x for x in unique_objs_dict if x != obj_label]
+        )
+
         synth_obj_surface = random.choice(unique_objs_dict[synth_obj_label])
         synth_ctx = masked_sent.replace('[MASK]', synth_obj_surface)
         # print('Synthetic fact: ({}, {}, {})\n'.format(sub_label, synth_obj_label, synth_ctx))
@@ -331,10 +324,7 @@ def load_augmented_trigger_dataset(fname, templatizer, limit=None):
         except ValueError as e:
             print(e)
 
-    if limit:
-        return random.sample(instances, limit)
-    else:
-        return instances
+    return random.sample(instances, limit) if limit else instances
 
 
 def load_classification_dataset(

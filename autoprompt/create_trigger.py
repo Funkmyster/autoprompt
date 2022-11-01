@@ -50,8 +50,9 @@ class PredictWrapper:
         predict_mask = model_inputs.pop('predict_mask')
         model_inputs = replace_trigger_tokens(model_inputs, trigger_ids, trigger_mask)
         logits, *_ = self._model(**model_inputs)
-        predict_logits = logits.masked_select(predict_mask.unsqueeze(-1)).view(logits.size(0), -1)
-        return predict_logits
+        return logits.masked_select(predict_mask.unsqueeze(-1)).view(
+            logits.size(0), -1
+        )
 
 
 class AccuracyFn:
@@ -389,9 +390,8 @@ def run_model(args):
         # TODO: Something cleaner. LAMA templates can't have mask tokens, so if
         # there are still mask tokens in the trigger then set the current score
         # to -inf.
-        if args.print_lama:
-            if trigger_ids.eq(tokenizer.mask_token_id).any():
-                current_score = float('-inf')
+        if args.print_lama and trigger_ids.eq(tokenizer.mask_token_id).any():
+            current_score = float('-inf')
 
         if (candidate_scores > current_score).any():
             logger.info('Better trigger detected.')
@@ -421,9 +421,11 @@ def run_model(args):
         # TODO: Something cleaner. LAMA templates can't have mask tokens, so if
         # there are still mask tokens in the trigger then set the current score
         # to -inf.
-        if args.print_lama:
-            if best_trigger_ids.eq(tokenizer.mask_token_id).any():
-                best_dev_metric = float('-inf')
+        if (
+            args.print_lama
+            and best_trigger_ids.eq(tokenizer.mask_token_id).any()
+        ):
+            best_dev_metric = float('-inf')
 
         if dev_metric > best_dev_metric:
             logger.info('Best performance so far')
@@ -514,10 +516,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    if args.debug:
-        level = logging.DEBUG
-    else:
-        level = logging.INFO
+    level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=level)
 
     run_model(args)
